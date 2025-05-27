@@ -1,0 +1,10 @@
+HISTORY_CONTEXT_SIZE: 5
+TEMPERTURE: 0.7
+TOP_P: 1
+DEFAULT_MODEL: gpt-4o
+OPENAI:
+  BASE_URL: https://api.openai.com/v1
+  API_KEY: ''
+MISTRAL:
+  BASE_URL: https://api.mistral.ai
+  API_KEY: ''
