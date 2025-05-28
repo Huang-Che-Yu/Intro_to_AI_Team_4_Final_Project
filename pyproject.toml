@@ -4,22 +4,31 @@ version = "0.1.0"
 description = ""
 authors = ["SiriusKoan <me@siriuskoan.one>"]
 readme = "README.md"
+keywords = ["llm", "terminal", "cli"]
+classifiers = ["Programming Language :: Python :: 3.12"]
+
+[tool.poetry.scripts]
+term-assistant = "term_assistant.__main__:cli"
 
 [tool.poetry.dependencies]
 python = "^3.12"
 mistralai = "^1.1.0"
 openai = "^1.51.1"
 click = "^8.1.7"
-flake8-pyproject = "^1.2.3"
 pyyaml = "^6.0.2"
 colorama = "^0.4.6"
-mypy = "^1.11.2"
 
 [tool.flake8]
-max-line-length = 120
+ignore = ['E501']
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.10.0"
+flake8-pyproject = "^1.2.3"
+pyright = "^1.1.384"
+
+
+[tool.poetry.group.test.dependencies]
+pytest = "^8.3.3"
 
 [build-system]
 requires = ["poetry-core"]

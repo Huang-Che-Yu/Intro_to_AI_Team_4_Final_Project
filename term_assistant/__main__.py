@@ -82,8 +82,12 @@ def talk(
     top_p,
     no_tools,
 ):
-    logger = get_logger()
+    """
+    Takes a prompt and returns a response from the assistant.
+    """
+    logger = LoggerManager.get_logger()
     config = load_config()
+    # Prepare the context
     context = {}
     if not no_context:
         if not no_pwd:
@@ -92,15 +96,21 @@ def talk(
             history_context_size = (
                 history_context_size or config["HISTORY_CONTEXT_SIZE"]
             )
-            context["The commands executed above are"] = get_history(
-                history_context_size
+            context["The commands executed above are"] = ", ".join(
+                get_history(history_context_size)
             )
+
+    # Prepare the model and provider
     if model is None:
         model = config["DEFAULT_MODEL"]
-    if not prompt:
-        prompt = input("(Enter your prompt) >>> ")
     if not provider:
         provider = get_provider(model)
+
+    # Get prompt
+    if not prompt:
+        prompt = input("(Enter your prompt) >>> ")
+
+    # Create the assistant and get the response
     assistant = create_assistant(provider, model, temperature, top_p, no_tools)
     if assistant:
         logger.info(f"Using model {model} from provider {assistant.__class__.__name__}")
@@ -113,6 +123,9 @@ def talk(
 
 @cli.command()
 def models():
+    """
+    Lists all available models from all providers.
+    """
     models = get_available_models()
     for provider, models in models.items():
         print(f"{Fore.BLUE}Provider: {provider}{Style.RESET_ALL}")
