@@ -41,6 +41,8 @@ class Config:
         TEMPERATURE (float): The temperature setting for the model.
         TOP_P (float): The top-p setting for the model.
         DEFAULT_MODEL (str): The default model to be used.
+        DEFAULT_SYSTEM_MESSAGE (str): The default system message to be used.
+        SYSTEM_MESSAGES (dict): A dictionary of system messages.
         OPENAI (OpenAIConfig): Configuration settings for OpenAI.
         MISTRAL (MistralConfig): Configuration settings for Mistral.
     """
@@ -49,6 +51,8 @@ class Config:
     TEMPERATURE: float = 0.7
     TOP_P: float = 1.0
     DEFAULT_MODEL: str = "gpt-4o"
+    DEFAULT_SYSTEM_MESSAGE: str = "default"
+    SYSTEM_MESSAGES: dict = field(default_factory=dict)
     OPENAI: OpenAIConfig = field(default_factory=OpenAIConfig)
     MISTRAL: MistralConfig = field(default_factory=MistralConfig)
 

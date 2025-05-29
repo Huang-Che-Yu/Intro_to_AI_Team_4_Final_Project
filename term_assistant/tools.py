@@ -1,6 +1,12 @@
 from dataclasses import dataclass
 from typing import Callable
 from .terminal import run_command, read_file
+from mistralai import (
+    Tool as MistralTool,
+    Function as MistralFunction,
+)
+from openai.types.shared_params.function_definition import FunctionDefinition
+from openai.types.chat import ChatCompletionToolParam as OpenAITool
 
 
 @dataclass
@@ -23,38 +29,57 @@ class Parameter:
 class Tool:
     """
     The Tool class represents a tool with a callable function and its parameters.
+
     Attributes:
         function (callable): The function that the tool will execute.
         parameters (dict[str, Parameter]): A dictionary of parameters for the function,
             where the key is the parameter name and the value is a Parameter object.
-    Methods:
-        generate_tool_call():
-            Generates a dictionary representing the tool call, including the function's
-            name, description, parameters, and required parameters.
-            Returns:
-                dict: A dictionary with the structure of the tool call.
+        openai_tool (OpenAITool)
+            A property to represent the tool in the format required by OpenAI.
+        mistral_tool (MistralTool)
+            A property to represent the tool in the format required by Mistral.
     """
 
     function: Callable
     parameters: dict[str, Parameter]
 
-    def generate_tool_call(self) -> dict:
-        return {
-            "type": "function",
-            "function": {
-                "name": self.function.__name__,
-                "description": (
+    @property
+    def openai_tool(self) -> OpenAITool:
+        return OpenAITool(
+            function=FunctionDefinition(
+                name=self.function.__name__,
+                description=(
                     self.function.__doc__.strip() if self.function.__doc__ else ""
                 ),
-                "parameters": {
+                parameters={
+                    "type": "object",
+                    "properties": {k: v.__dict__ for k, v in self.parameters.items()},
+                    "required": [
+                        k for k, v in self.parameters.items() if not v.optional
+                    ],
+                },
+            ),
+            type="function",
+        )
+
+    @property
+    def mistral_tool(self) -> MistralTool:
+        return MistralTool(
+            function=MistralFunction(
+                name=self.function.__name__,
+                description=(
+                    self.function.__doc__.strip() if self.function.__doc__ else ""
+                ),
+                parameters={
                     "type": "object",
                     "properties": {**self.parameters},
                     "required": [
                         k for k, v in self.parameters.items() if not v.optional
                     ],
                 },
-            },
-        }
+            ),
+            type="function",
+        )
 
 
 tools: dict[str, Tool] = {

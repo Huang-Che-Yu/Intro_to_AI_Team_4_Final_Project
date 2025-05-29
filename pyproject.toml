@@ -9,9 +9,12 @@ classifiers = ["Programming Language :: Python :: 3.12"]
 
 [tool.poetry.scripts]
 term-assistant = "term_assistant.__main__:cli"
+envfish = { reference = "scripts/env.fish", type = "file" }
+envbash = { reference = "scripts/env.bash", type = "file" }
+envzsh = { reference = "scripts/env.zsh", type = "file" }
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = "^3.10"
 mistralai = "^1.1.0"
 openai = "^1.51.1"
 click = "^8.1.7"

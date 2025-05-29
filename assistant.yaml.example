@@ -2,6 +2,10 @@ HISTORY_CONTEXT_SIZE: 5
 TEMPERATURE: 0.7
 TOP_P: 1
 DEFAULT_MODEL: gpt-4o
+DEFAULT_SYSTEM_MESSAGE: "default"
+SYSTEM_MESSAGES:
+  default: "You are a terminal assistant. Your task is to assist the user with terminal commands, system administration, and shell scripting. Provide help for common command-line tools and tasks when necessary, and always answers concisely."
+  empty: ""
 OPENAI:
   BASE_URL: https://api.openai.com/v1
   API_KEY: ''

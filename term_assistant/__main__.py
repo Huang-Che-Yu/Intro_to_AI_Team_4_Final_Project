@@ -1,3 +1,4 @@
+import logging
 from .llm import get_provider, get_available_models, create_assistant
 from .terminal import get_history, get_current_dir
 from .config import load_config
@@ -14,7 +15,7 @@ def cli(ctx):
 
 
 @cli.command()
-@click.argument("prompt", required=False)
+@click.argument("prompt", required=True)
 @click.option(
     "-m", "--model", type=str, help="Model to use for completion", default=None
 )
@@ -32,6 +33,7 @@ def cli(ctx):
     help="Provider to use for completion",
     default=None,
 )
+@click.option("-s", "--system", type=str, help="The system message", default=None)
 @click.option(
     "--dry-run",
     is_flag=True,
@@ -69,11 +71,13 @@ def cli(ctx):
     is_flag=True,
     help="Do not include the tools in the context",
 )
+@click.option("-v", "--verbose", is_flag=True, help="Enable verbose mode")
 def talk(
     prompt,
     model,
     history_context_size,
     provider,
+    system,
     dry_run,
     no_context,
     no_pwd,
@@ -81,23 +85,40 @@ def talk(
     temperature,
     top_p,
     no_tools,
+    verbose,
 ):
     """
     Takes a prompt and returns a response from the assistant.
     """
-    logger = LoggerManager.get_logger()
+    logger = LoggerManager.get_logger(level=logging.DEBUG if verbose else logging.INFO)
     config = load_config()
+
+    context: list[str] = []
+    # System message
+    system_msg = ""
+    if system is None:
+        system_msg = config["SYSTEM_MESSAGES"].get(config["DEFAULT_SYSTEM_MESSAGE"], "")
+    else:
+        system_msg = (
+            system if " " in system else config["SYSTEM_MESSAGES"].get(system, "")
+        )
+    if system_msg != "":
+        context.append(system_msg)
+    else:
+        logger.warning(
+            f"System message {system} not found in the configuration, using empty message."
+        )
     # Prepare the context
-    context = {}
     if not no_context:
         if not no_pwd:
-            context["The current directory is"] = get_current_dir()
+            context.append(f"The current directory is {get_current_dir()}")
         if not no_history:
             history_context_size = (
                 history_context_size or config["HISTORY_CONTEXT_SIZE"]
             )
-            context["The commands executed above are"] = ", ".join(
-                get_history(history_context_size)
+            context.append(
+                "The commands executed above are: "
+                ", ".join(get_history(history_context_size))
             )
 
     # Prepare the model and provider
@@ -106,10 +127,6 @@ def talk(
     if not provider:
         provider = get_provider(model)
 
-    # Get prompt
-    if not prompt:
-        prompt = input("(Enter your prompt) >>> ")
-
     # Create the assistant and get the response
     assistant = create_assistant(provider, model, temperature, top_p, no_tools)
     if assistant:
@@ -117,6 +134,10 @@ def talk(
         if not dry_run:
             for response in assistant.assist(context, [prompt]):
                 print(response, end="", flush=True)
+        else:
+            logger.debug(f"[Dry run] Context: {context}")
+            logger.debug(f"[Dry run] Prompt: {prompt}")
+            logger.info("Dry run completed.")
     else:
         logger.warning(f"Model {model} not found in any provider.")
 

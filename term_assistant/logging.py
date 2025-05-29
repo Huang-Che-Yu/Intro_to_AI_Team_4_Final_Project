@@ -3,7 +3,7 @@ import logging
 from colorama import Fore, Style
 
 COLORS = {
-    logging.DEBUG: "",
+    logging.DEBUG: Fore.LIGHTBLACK_EX,
     logging.INFO: Fore.BLUE,
     logging.WARNING: Fore.YELLOW,
     logging.ERROR: Fore.RED,

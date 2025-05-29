@@ -1,17 +1,23 @@
 import json
-from typing import Type
+from typing import Type, Generator
 from .logging import LoggerManager
 from .config import load_config
 from .tools import tools
 from mistralai import (
     Mistral,
     FunctionCall,
-    Tool,
     UserMessage,
     SystemMessage,
 )
-from typing import Generator
 from openai import OpenAI
+from openai._types import NOT_GIVEN
+from openai.types.chat.chat_completion_chunk import (
+    ChoiceDelta,
+)
+from openai.types.chat import (
+    ChatCompletionSystemMessageParam,
+    ChatCompletionUserMessageParam,
+)
 from colorama import Fore, Style
 
 
@@ -31,7 +37,7 @@ class Provider:
         raise NotImplementedError
 
     def assist(
-        self, context: dict[str, str], prompts: list[str], tool_messages: list[str] = []
+        self, context: list[str], prompts: list[str], tool_messages: list[str] = []
     ):
         raise NotImplementedError
 
@@ -47,34 +53,172 @@ class OpenAIAPI(Provider):
         top_p=None,
         no_tools=False,
     ):
-        self.model_name = model_name
-        self.api_key = api_key
-        self.base_url = base_url
-        self.llm = OpenAI(api_key=api_key, base_url=base_url)
+        """
+        OpenAIAPI class for interacting with OpenAI's API.
 
-    def get_models(self, full=False):
+        Attributes:
+            model_name (str): The name of the model to use.
+            api_key (str, optional): The API key for authenticating with OpenAI. Defaults to None.
+            base_url (str, optional): The base URL for the OpenAI API. Defaults to None.
+            temperature (float, optional): The temperature for the model's output. Defaults to None.
+            top_p (float, optional): The top-p value for the model's output. Defaults to None.
+            no_tools (bool, optional): Flag to disable tool usage. Defaults to False.
+        """
+
+        self.model_name: str = model_name
+        self.api_key: str | None = api_key
+        self.base_url: str | None = base_url
+        self.temperature: float | None = temperature
+        self.top_p: float | None = top_p
+        self.llm: OpenAI = OpenAI(api_key=api_key, base_url=base_url)
+        self.no_tools: bool = no_tools
+
+    def get_models(self, full: bool = False) -> list[str]:
+        """
+        Get available models from the OpenAI API.
+
+        Args:
+            full (bool, optional): If True, fetch the full list of models from the API. Defaults to False.
+
+        Returns:
+            list[str]: The list of available model names.
+        """
+
         if full:
             return sorted([m.id for m in self.llm.models.list()])
-        return ["gpt-4", "gpt-4o", "gpt-4-mini"]
+        return ["o1-preview", "o1-mini", "gpt-4o", "gpt-4o-mini"]
+
+    def utilize_tool(self, name: str, args: str) -> str:
+        """Utilize a tool.
+
+        Args:
+            tool (ChoiceDeltaToolCallFunction): The tool to utilize
+
+        Returns:
+            str: The output of the tool
+        """
+
+        args = args if isinstance(args, dict) else json.loads(args or "{}")
+        if tools.get(name):
+            confirm = input(f"Use tool {name} with arguments {args}? (y/n): ").lower()
+            return (
+                tools[name].function(
+                    **args if isinstance(args, dict) else {"arg": args}
+                )
+                if confirm == "y"
+                else "User cancelled."
+            )
+        return ""
 
     def assist(
-        self, context: dict[str, str], prompts: list[str], tool_messages: list[str] = []
-    ):
+        self, context: list[str], prompts: list[str], tool_messages: list[str] = []
+    ) -> Generator[str, None, None]:
+        """Assist the user with the given context and prompts.
+
+        Args:
+            context (dict[str, str]): The context, which are system messages
+            prompts (list[str]): The prompts, which are user messages
+            tool_messages (list[str], optional): The output from tools, which are user messages. Defaults to [].
+
+        Yields:
+            Generator[str, None, None]: The response from the LLM
+        """
+
+        # Get the response stream from the LLM
         response = self.llm.chat.completions.create(
             model=self.model_name,
             messages=[
-                {
-                    "role": "system",
-                    "content": "\n".join(
-                        [f"{k}:\n{v}" for k, v in context.items() if v]
-                    ),
-                },
-                # {"role": "user", "content": prompt},
+                *[
+                    ChatCompletionSystemMessageParam(role="system", content=msg)
+                    for msg in context
+                ],
+                *[
+                    ChatCompletionUserMessageParam(role="user", content=prompt)
+                    for prompt in prompts
+                ],
+                *[
+                    ChatCompletionUserMessageParam(role="user", content=msg)
+                    for msg in tool_messages
+                ],
             ],
-            # tools=tools,
+            tools=(
+                [tool.openai_tool for tool in tools.values()]
+                if not self.no_tools
+                else NOT_GIVEN
+            ),
+            temperature=self.temperature,
+            top_p=self.top_p,
+            stream=True,
+            stream_options={"include_usage": True},
         )
-        message = response.choices[0].message
-        return f"{Fore.GREEN}{message.role}({response.model}): {Style.RESET_ALL}{message.content}"
+
+        # Log the context, prompts, and tool messages
+        logger = LoggerManager.get_logger()
+        logger.debug(f"Context: {context}")
+        logger.debug(f"Prompts: {prompts}")
+        logger.debug(f"Tool Messages: {tool_messages}")
+
+        full_response = ""
+        tool_name = ""
+        tool_args = ""
+        for chunk in response or []:
+            logger.debug(f"Chunk: {chunk}")
+            message = ChoiceDelta()
+            finish_reason = ""
+            if len(chunk.choices) == 0:
+                # No choices, so finish with usage
+                finish_reason = "usage"
+            else:
+                message = chunk.choices[0].delta
+                finish_reason = chunk.choices[0].finish_reason
+
+            if message.role:
+                # First chunk, so also print the system message
+                yield f"{Fore.GREEN}{message.role}({chunk.model}): {Style.RESET_ALL}"
+
+            if not finish_reason:
+                if message.tool_calls is not None:
+                    # Middle chunk with tool calls
+                    tool_call = message.tool_calls[0]
+                    func = tool_call.function
+                    if func:
+                        if func.name is not None:
+                            tool_name = func.name
+                        tool_args += func.arguments or ""
+                else:
+                    # Middle chunk, so just print the content
+                    full_response += message.content or ""
+                    yield message.content or ""
+            elif finish_reason == "tool_calls":
+                # Tool calls, so utilize the tools and feed the output back to the LLM
+                tool_outputs = {}
+
+                # Utilize the tools and log the output
+                if tool_name and tool_args:
+                    if tool_name in tools:
+                        yield f"{Fore.GREEN}Using tool {tool_name}...{Style.RESET_ALL}\n"
+                        tool_output = self.utilize_tool(tool_name, tool_args)
+                        tool_outputs[tool_name] = tool_output
+                        logger.debug(f"Use tool: {tool_name}, Output: {tool_output}")
+                    yield "\n"
+
+                # If there are tool outputs, feed them back to the LLM
+                if tool_outputs:
+                    for next_response in self.assist(
+                        context,
+                        prompts,
+                        tool_messages=[
+                            f"Output from {k}: {v}" for k, v in tool_outputs.items()
+                        ],
+                    ):
+                        yield next_response
+            elif finish_reason == "stop":
+                # Last chunk, so log the full response and the response info, and yield a newline
+                logger.debug(f"Response: {full_response}")
+                yield "\n"
+            elif finish_reason == "usage":
+                logger.debug(f"Response Info: {chunk.usage}")
+                logger.debug("Streaming complete.")
 
 
 class MistralAPI(Provider):
@@ -155,7 +299,7 @@ class MistralAPI(Provider):
         return ""
 
     def assist(
-        self, context: dict[str, str], prompts: list[str], tool_messages: list[str] = []
+        self, context: list[str], prompts: list[str], tool_messages: list[str] = []
     ) -> Generator[str, None, None]:
         """Assist the user with the given context and prompts.
 
@@ -169,23 +313,15 @@ class MistralAPI(Provider):
         """
 
         # Get the response stream from the LLM
-        tool_dict = [tool.generate_tool_call() for tool in tools.values()]
         response = self.llm.chat.stream(
             model=self.model_name,
             messages=[
-                *[
-                    SystemMessage(role="system", content=f"{k}: {v}")
-                    for k, v in context.items()
-                    if v
-                ],
+                *[SystemMessage(role="system", content=msg) for msg in context],
                 *[UserMessage(role="user", content=prompt) for prompt in prompts],
                 *[UserMessage(role="user", content=msg) for msg in tool_messages],
             ],
             tools=(
-                [
-                    Tool(type=tool["type"], function=tool["function"])
-                    for tool in tool_dict
-                ]
+                [tool.mistral_tool for tool in tools.values()]
                 if not self.no_tools
                 else None
             ),
@@ -220,7 +356,7 @@ class MistralAPI(Provider):
                 tool_calls = message.tool_calls
                 if tool_calls:
                     for tool in tool_calls:
-                        yield f"{Fore.GREEN}Using tool {tool.function.name}...{Style.RESET_ALL} "
+                        yield f"{Fore.GREEN}Using tool {tool.function.name}...{Style.RESET_ALL}\n"
                         tool_output = self.utilize_tool(tool.function)
                         tool_outputs[tool.function.name] = tool_output
                         logger.debug(f"Use tool: {tool}, Output: {tool_output}")
@@ -240,7 +376,7 @@ class MistralAPI(Provider):
             elif finish_reason == "stop":
                 # Last chunk, so log the full response and the response info, and yield a newline
                 logger.debug(f"Response: {full_response}")
-                logger.debug(f"Reponse Info: {chunk.data.usage}")
+                logger.debug(f"Response Info: {chunk.data.usage}")
                 yield "\n"
                 logger.debug("Streaming complete.")
 
