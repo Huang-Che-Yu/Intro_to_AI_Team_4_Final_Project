@@ -25,7 +25,7 @@ colorama = "^0.4.6"
 ignore = ['E501']
 
 [tool.poetry.group.dev.dependencies]
-black = "^24.10.0"
+black = "^25.1.0"
 flake8-pyproject = "^1.2.3"
 pyright = "^1.1.401"
 
