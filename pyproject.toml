@@ -15,7 +15,7 @@ envzsh = { reference = "scripts/env.zsh", type = "file" }
 
 [tool.poetry.dependencies]
 python = "^3.10"
-mistralai = "^1.1.0"
+mistralai = "^1.8.1"
 openai = "^1.51.1"
 click = "^8.1.7"
 pyyaml = "^6.0.2"
