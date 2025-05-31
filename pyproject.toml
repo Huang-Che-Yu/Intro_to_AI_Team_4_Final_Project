@@ -17,7 +17,7 @@ envzsh = { reference = "scripts/env.zsh", type = "file" }
 python = "^3.10"
 mistralai = "^1.8.1"
 openai = "^1.51.1"
-click = "^8.1.7"
+click = "^8.2.1"
 pyyaml = "^6.0.2"
 colorama = "^0.4.6"
 
