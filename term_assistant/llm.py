@@ -1,24 +1,26 @@
 import json
-from typing import Type, Generator
-from .logging import LoggerManager
-from .config import load_config
-from .tools import tools
-from mistralai import (
-    Mistral,
-    FunctionCall,
-    UserMessage,
-    SystemMessage,
-)
+from typing import Generator, Type
+
+import google.generativeai as Gemini
+import ollama
+from colorama import Fore, Style
+from google.ai.generativelanguage import FunctionCall as GeminiFunctionCall
+from google.ai.generativelanguage import FunctionResponse, Part
+from google.generativeai import GenerationConfig
+from google.generativeai.protos import Content
+from google.protobuf.struct_pb2 import Struct
+from mistralai import FunctionCall, Mistral, SystemMessage, UserMessage
 from openai import OpenAI
 from openai._types import NOT_GIVEN
-from openai.types.chat.chat_completion_chunk import (
-    ChoiceDelta,
-)
 from openai.types.chat import (
     ChatCompletionSystemMessageParam,
     ChatCompletionUserMessageParam,
 )
-from colorama import Fore, Style
+from openai.types.chat.chat_completion_chunk import ChoiceDelta
+
+from .config import load_config
+from .logging import LoggerManager
+from .tools import tools
 
 
 class Provider:
@@ -37,7 +39,10 @@ class Provider:
         raise NotImplementedError
 
     def assist(
-        self, context: list[str], prompts: list[str], tool_messages: list[str] = []
+        self,
+        context: list[str],
+        prompts: list[str],
+        tool_messages: list[str] | None = None,
     ):
         raise NotImplementedError
 
@@ -111,7 +116,10 @@ class OpenAIAPI(Provider):
         return ""
 
     def assist(
-        self, context: list[str], prompts: list[str], tool_messages: list[str] = []
+        self,
+        context: list[str],
+        prompts: list[str],
+        tool_messages: list[str] | None = None,
     ) -> Generator[str, None, None]:
         """Assist the user with the given context and prompts.
 
@@ -138,7 +146,7 @@ class OpenAIAPI(Provider):
                 ],
                 *[
                     ChatCompletionUserMessageParam(role="user", content=msg)
-                    for msg in tool_messages
+                    for msg in (tool_messages or [])
                 ],
             ],
             tools=(
@@ -162,7 +170,6 @@ class OpenAIAPI(Provider):
         tool_name = ""
         tool_args = ""
         for chunk in response or []:
-            logger.debug(f"Chunk: {chunk}")
             message = ChoiceDelta()
             finish_reason = ""
             if len(chunk.choices) == 0:
@@ -299,7 +306,10 @@ class MistralAPI(Provider):
         return ""
 
     def assist(
-        self, context: list[str], prompts: list[str], tool_messages: list[str] = []
+        self,
+        context: list[str],
+        prompts: list[str],
+        tool_messages: list[str] | None = None,
     ) -> Generator[str, None, None]:
         """Assist the user with the given context and prompts.
 
@@ -318,7 +328,10 @@ class MistralAPI(Provider):
             messages=[
                 *[SystemMessage(role="system", content=msg) for msg in context],
                 *[UserMessage(role="user", content=prompt) for prompt in prompts],
-                *[UserMessage(role="user", content=msg) for msg in tool_messages],
+                *[
+                    UserMessage(role="user", content=msg)
+                    for msg in (tool_messages or [])
+                ],
             ],
             tools=(
                 [tool.mistral_tool for tool in tools.values()]
@@ -346,8 +359,17 @@ class MistralAPI(Provider):
 
             if not finish_reason:
                 # Middle chunk, so just print the content
-                full_response += message.content or ""
-                yield message.content or ""
+                if not message.content:
+                    yield ""
+                elif isinstance(message.content, str):
+                    full_response += message.content
+                    yield message.content
+                elif isinstance(message.content, list):
+                    cancatenated_content = " ".join(
+                        [str(msg) for msg in message.content]
+                    )
+                    full_response += cancatenated_content
+                    yield cancatenated_content
             elif finish_reason == "tool_calls":
                 # Tool calls, so utilize the tools and feed the output back to the LLM
                 tool_outputs = {}
@@ -381,7 +403,185 @@ class MistralAPI(Provider):
                 logger.debug("Streaming complete.")
 
 
-LLM_PROVIDERS: dict[str, Type[Provider]] = {"OPENAI": OpenAIAPI, "MISTRAL": MistralAPI}
+class GeminiAPI(Provider):
+    def __init__(
+        self,
+        model_name,
+        api_key=None,
+        base_url=None,
+        temperature=None,
+        top_p=None,
+        no_tools=False,
+    ):
+        self.model_name: str = model_name
+        self.api_key: str | None = api_key
+        self.base_url: str | None = base_url
+        self.temperature: float | None = temperature
+        self.top_p: float | None = top_p
+        self.no_tools: bool = no_tools
+        Gemini.configure(api_key=api_key)
+        self.llm: Gemini.GenerativeModel = Gemini.GenerativeModel(
+            model_name,
+            generation_config=GenerationConfig(
+                temperature=self.temperature,
+                top_p=self.top_p,
+            ),
+            tools=(
+                [tool.gemini_tool for tool in tools.values()]
+                if not self.no_tools
+                else None
+            ),
+        )
+
+    def get_models(self, full=False) -> list[str]:
+        if full:
+            return sorted([model["name"] for model in Gemini.list_models()])
+        return ["gemini-1.5-pro-002", "gemini-1.5-flash-002", "gemini-1.5-flash-8b-001"]
+
+    def utilize_tool(self, name: str, args: dict[str, str]) -> str:
+        if tools.get(name):
+            confirm = input(f"Use tool {name} with arguments {args}? (y/n): ").lower()
+            return (
+                tools[name].function(
+                    **args if isinstance(args, dict) else {"arg": args}
+                )
+                if confirm == "y"
+                else "User cancelled."
+            )
+        return ""
+
+    def assist(
+        self,
+        context: list[str],
+        prompts: list[str],
+        tool_calls: list[dict] = [],
+        tool_messages: list[str] | None = None,
+    ) -> Generator[str, None, None]:
+        """Assist the user with the given context and prompts.
+
+        Args:
+            context (list[str]): The context, which are system messages
+            prompts (list[str]): The prompts, which are user messages
+            tool_messages (list[str], optional): The output from tools, which are user messages. Defaults to None.
+
+        Yields:
+            Generator[str, None, None]: The response from the LLM
+        """
+
+        # Get the response stream from the LLM
+        tool_messages_gemini_use = []
+        for msg in tool_messages or []:
+            tool_msg_struct = Struct()
+            tool_msg_struct.update({"result": msg})
+            tool_messages_gemini_use.append(
+                Part(
+                    function_response=FunctionResponse(
+                        name="run_command", response=tool_msg_struct
+                    )
+                )
+            )
+        chat = self.llm.start_chat(
+            history=[
+                *[Content(role="user", parts=[Part(text=msg)]) for msg in context],
+                *[
+                    Content(role="user", parts=[Part(text=prompt)])
+                    for prompt in prompts[:-1]
+                ],
+                *[
+                    Content(
+                        role="model",
+                        parts=[
+                            Part(
+                                function_call=GeminiFunctionCall(
+                                    name=tool_call["name"], args=tool_call["args"]
+                                )
+                            )
+                        ],
+                    )
+                    for tool_call in tool_calls
+                ],
+                *[
+                    Content(role="user", parts=[msg])
+                    for msg in tool_messages_gemini_use
+                ],
+            ],
+        )
+        response = chat.send_message(
+            prompts[-1],
+            # TODO: The `google.generativeai` SDK currently does not support the combination of `stream=True` and `enable_automatic_function_calling=True`.
+            # stream=True,
+        )
+
+        logger = LoggerManager.get_logger()
+        logger.debug(f"Context: {context}")
+        logger.debug(f"Prompts: {prompts}")
+        logger.debug(f"Tool Messages: {tool_messages}")
+
+        logger.debug(f"Response: {response}")
+        tool_calls = []
+        tool_outputs = {}
+        parts = response.parts
+        for part in parts:
+            if part.text:
+                logger.debug(f"Response: {part.text}")
+                logger.debug(f"Response Info: {response.usage_metadata}")
+                logger.debug("Responsing complete.")
+                yield part.text
+            elif part.function_call:
+                tool_name = part.function_call.name
+                tool_args = {k: str(v) for k, v in part.function_call.args.items()}
+                tool_output = self.utilize_tool(tool_name, tool_args)
+                tool_calls.append({"name": tool_name, "args": tool_args})
+                tool_outputs[tool_name] = tool_output
+                logger.debug(f"Use tool: {tool_name}, Output: {tool_output}")
+                yield "\n"
+
+        if tool_outputs:
+            for next_response in self.assist(
+                context,
+                prompts,
+                tool_calls=tool_calls,
+                tool_messages=[f"{v}" for k, v in tool_outputs.items()],
+            ):
+                yield next_response
+
+
+class OllamaAPI(Provider):
+    def __init__(
+        self,
+        model_name,
+        api_key=None,
+        base_url=None,
+        temperature=None,
+        top_p=None,
+        no_tools=False,
+    ):
+        self.model_name: str = model_name
+        self.base_url: str | None = base_url
+        self.temperature: float | None = temperature
+        self.top_p: float | None = top_p
+        self.llm: ollama.Client = ollama.Client(host=base_url)
+        self.no_tools: bool = no_tools
+
+    def get_models(self, full=False) -> list[str]:
+        return [model["name"] for model in ollama.list()["models"]]
+
+    def utilize_tool(self, tool) -> str: ...
+
+    def assist(
+        self,
+        context: list[str],
+        prompts: list[str],
+        tool_messages: list[str] | None = None,
+    ) -> Generator[str, None, None]: ...
+
+
+LLM_PROVIDERS: dict[str, Type[Provider]] = {
+    "OPENAI": OpenAIAPI,
+    "MISTRAL": MistralAPI,
+    "GEMINI": GeminiAPI,
+    "OLLAMA": OllamaAPI,
+}
 
 
 def create_assistant(
@@ -437,7 +637,7 @@ def get_provider(model: str) -> str:
         str: The provider name
     """
 
-    for provider in LLM_PROVIDERS.keys():
+    for provider in LLM_PROVIDERS:
         assistant = create_assistant(provider, "")
         if assistant:
             if model.lower() in [m.lower() for m in assistant.get_models()]:
@@ -453,7 +653,7 @@ def get_available_models() -> dict[str, list[str]]:
     """
 
     available_models: dict[str, list[str]] = {}
-    for provider in LLM_PROVIDERS.keys():
+    for provider in LLM_PROVIDERS:
         assistant = create_assistant(provider, "")
         if assistant:
             available_models[provider] = assistant.get_models()

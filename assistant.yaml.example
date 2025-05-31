@@ -3,6 +3,10 @@ TEMPERATURE: 0.7
 TOP_P: 1
 DEFAULT_MODEL: gpt-4o
 DEFAULT_SYSTEM_MESSAGE: "default"
+CONTEXTS:
+  - history
+  - pwd
+  - shell
 SYSTEM_MESSAGES:
   default: "You are a terminal assistant. Your task is to assist the user with terminal commands, system administration, and shell scripting. Provide help for common command-line tools and tasks when necessary, and always answers concisely."
   empty: ""
@@ -11,4 +15,10 @@ OPENAI:
   API_KEY: ''
 MISTRAL:
   BASE_URL: https://api.mistral.ai
+  API_KEY: ''
+GEMINI:
+  BASE_URL: https://generativelanguage.googleapis.com
+  API_KEY: ''
+OLLAMA:
+  BASE_URL: http://localhost:11434
   API_KEY: ''

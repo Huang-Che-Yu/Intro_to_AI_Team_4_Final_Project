@@ -1,12 +1,13 @@
 from dataclasses import dataclass
 from typing import Callable
-from .terminal import run_command, read_file
-from mistralai import (
-    Tool as MistralTool,
-    Function as MistralFunction,
-)
-from openai.types.shared_params.function_definition import FunctionDefinition
+
+from google.generativeai.types import FunctionDeclaration as GeminiTool
+from mistralai import Function as MistralFunction
+from mistralai import Tool as MistralTool
 from openai.types.chat import ChatCompletionToolParam as OpenAITool
+from openai.types.shared_params.function_definition import FunctionDefinition
+
+from .terminal import read_file, run_command
 
 
 @dataclass
@@ -80,6 +81,10 @@ class Tool:
             ),
             type="function",
         )
+
+    @property
+    def gemini_tool(self) -> GeminiTool:
+        return GeminiTool.from_function(self.function)
 
 
 tools: dict[str, Tool] = {

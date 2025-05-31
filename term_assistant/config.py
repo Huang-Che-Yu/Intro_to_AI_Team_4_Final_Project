@@ -1,6 +1,7 @@
 import os
-import yaml
 from dataclasses import dataclass, field
+
+import yaml
 
 
 @dataclass
@@ -32,6 +33,34 @@ class MistralConfig:
 
 
 @dataclass
+class GeminiConfig:
+    """
+    Configuration settings for Gemini.
+
+    Attributes:
+        BASE_URL (str): The base URL for the Gemini API.
+        API_KEY (str): The API key for the Gemini API.
+    """
+
+    BASE_URL: str = "https://api.gemini.com"
+    API_KEY: str = ""
+
+
+@dataclass
+class OllamaConfig:
+    """
+    Configuration settings for Ollama.
+
+    Attributes:
+        BASE_URL (str): The base URL for the Ollama API.
+        API_KEY (str): The API key for the Ollama API.
+    """
+
+    BASE_URL: str = "https://api.ollama.com"
+    API_KEY: str = ""
+
+
+@dataclass
 class Config:
     """
     Configuration settings for the term assistant application.
@@ -45,6 +74,8 @@ class Config:
         SYSTEM_MESSAGES (dict): A dictionary of system messages.
         OPENAI (OpenAIConfig): Configuration settings for OpenAI.
         MISTRAL (MistralConfig): Configuration settings for Mistral.
+        GEMINI (GeminiConfig): Configuration settings for Gemini.
+        OLLAMA (OllamaConfig): Configuration settings for Ollama.
     """
 
     HISTORY_CONTEXT_SIZE: int = 5
@@ -52,9 +83,12 @@ class Config:
     TOP_P: float = 1.0
     DEFAULT_MODEL: str = "gpt-4o"
     DEFAULT_SYSTEM_MESSAGE: str = "default"
-    SYSTEM_MESSAGES: dict = field(default_factory=dict)
+    SYSTEM_MESSAGES: dict[str, str] = field(default_factory=dict)
+    CONTEXTS: list[str] = field(default_factory=lambda: ["shell", "pwd", "history"])
     OPENAI: OpenAIConfig = field(default_factory=OpenAIConfig)
     MISTRAL: MistralConfig = field(default_factory=MistralConfig)
+    GEMINI: GeminiConfig = field(default_factory=GeminiConfig)
+    OLLAMA: OllamaConfig = field(default_factory=OllamaConfig)
 
     def __getitem__(self, key):
         return getattr(self, key)

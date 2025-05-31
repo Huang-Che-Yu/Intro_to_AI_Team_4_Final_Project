@@ -3,8 +3,14 @@ from .llm import get_provider, get_available_models, create_assistant
 from .terminal import get_history, get_current_dir
 from .config import load_config
 from .logging import get_logger
+
 import click
 from colorama import Fore, Style
+
+from .config import load_config
+from .llm import create_assistant, get_available_models, get_provider
+from .logging import LoggerManager
+from .terminal import get_current_dir, get_current_shell, get_history
 
 
 @click.group(invoke_without_command=True)
@@ -50,6 +56,11 @@ def cli(ctx):
     help="Do not include the current directory in the context",
 )
 @click.option(
+    "--no-shell",
+    is_flag=True,
+    help="Do not include the current shell in the context",
+)
+@click.option(
     "--no-history",
     is_flag=True,
     help="Do not include the command history in the context",
@@ -81,6 +92,7 @@ def talk(
     dry_run,
     no_context,
     no_pwd,
+    no_shell,
     no_history,
     temperature,
     top_p,
@@ -110,15 +122,17 @@ def talk(
         )
     # Prepare the context
     if not no_context:
-        if not no_pwd:
+        if not no_pwd and "pwd" in config["CONTEXTS"]:
             context.append(f"The current directory is {get_current_dir()}")
-        if not no_history:
+        if not no_shell and "shell" in config["CONTEXTS"]:
+            context.append(f"The current shell is {get_current_shell()}")
+        if not no_history and "history" in config["CONTEXTS"]:
             history_context_size = (
                 history_context_size or config["HISTORY_CONTEXT_SIZE"]
             )
             context.append(
-                "The commands executed above are: "
-                ", ".join(get_history(history_context_size))
+                "The terminal session are: "
+                "\n".join(get_history(history_context_size))
             )
 
     # Prepare the model and provider
@@ -147,10 +161,10 @@ def models():
     """
     Lists all available models from all providers.
     """
-    models = get_available_models()
-    for provider, models in models.items():
+    available_models = get_available_models()
+    for provider, model_names in available_models.items():
         print(f"{Fore.BLUE}Provider: {provider}{Style.RESET_ALL}")
-        for model in models:
+        for model in model_names:
             print(f"  {model}")
 
 

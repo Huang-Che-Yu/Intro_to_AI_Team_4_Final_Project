@@ -10,24 +10,39 @@ classifiers = ["Programming Language :: Python :: 3.12"]
 [tool.poetry.scripts]
 term-assistant = "term_assistant.__main__:cli"
 envfish = { reference = "scripts/env.fish", type = "file" }
-envbash = { reference = "scripts/env.bash", type = "file" }
+envsh = { reference = "scripts/env.sh", type = "file" }
 envzsh = { reference = "scripts/env.zsh", type = "file" }
 
 [tool.poetry.dependencies]
 python = "^3.10"
-mistralai = "^1.1.0"
-openai = "^1.51.1"
-click = "^8.1.7"
+mistralai = "^1.2.6"
+click = "^8.1.8"
 pyyaml = "^6.0.2"
 colorama = "^0.4.6"
+ollama = "^0.4.5"
+openai = "^1.59.6"
+google-generativeai = "^0.8.3"
+grpcio = "1.67.1"
+grpcio-status = "1.67.1"
 
 [tool.flake8]
-ignore = ['E501']
+ignore = ['E501', 'E704']
+
+[tool.isort]
+profile = "black"
+src_paths = ["term_assistant", "tests"]
+
+[tool.pyright]
+include = ["term_assistant", "tests"]
+exclude = ["experiment"]
+reportMissingImports = "error"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.10.0"
 flake8-pyproject = "^1.2.3"
 pyright = "^1.1.384"
+pyright = "^1.1.391"
+isort = "^5.13.2"
 
 
 [tool.poetry.group.test.dependencies]
