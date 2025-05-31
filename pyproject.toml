@@ -38,7 +38,7 @@ exclude = ["experiment"]
 reportMissingImports = "error"
 
 [tool.poetry.group.dev.dependencies]
-black = "^24.10.0"
+black = "^25.1.0"
 flake8-pyproject = "^1.2.3"
 pyright = "^1.1.384"
 pyright = "^1.1.391"
@@ -46,7 +46,7 @@ isort = "^5.13.2"
 
 
 [tool.poetry.group.test.dependencies]
-pytest = "^8.3.3"
+pytest = "^8.3.5"
 
 [build-system]
 requires = ["poetry-core"]
