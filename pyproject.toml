@@ -1,27 +1,22 @@
 [tool.poetry]
 name = "term-assistant"
 version = "0.1.0"
-description = ""
+description = "Term Assistant is a command-line tool designed to assist users with prompt-based responses from various models."
 authors = ["SiriusKoan <me@siriuskoan.one>"]
 readme = "README.md"
 keywords = ["llm", "terminal", "cli"]
-classifiers = ["Programming Language :: Python :: 3.12"]
+classifiers = ["Programming Language :: Python :: 3.10"]
 
 [tool.poetry.scripts]
 term-assistant = "term_assistant.__main__:cli"
-envfish = { reference = "scripts/env.fish", type = "file" }
-envsh = { reference = "scripts/env.sh", type = "file" }
-envzsh = { reference = "scripts/env.zsh", type = "file" }
 
 [tool.poetry.dependencies]
 python = "^3.10"
-click = "^8.1.8"
+click = "^8.2.0"
 pyyaml = "^6.0.2"
 colorama = "^0.4.6"
-grpcio = "1.67.1"
-grpcio-status = "1.67.1"
 litellm = "1.55.12"
-libtmux = "^0.40.1"
+libtmux = "^0.46.1"
 
 [tool.flake8]
 ignore = ['E501', 'E704']
@@ -38,8 +33,9 @@ reportMissingImports = "error"
 [tool.poetry.group.dev.dependencies]
 black = "^25.1.0"
 flake8-pyproject = "^1.2.3"
-pyright = "^1.1.392"
-isort = "^5.13.2"
+pyright = "^1.1.400"
+isort = "^6.0.1"
+pyinstrument = "^5.0.1"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^8.3.5"

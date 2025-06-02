@@ -2,9 +2,10 @@ version = 1
 
 [[analyzers]]
 name = "python"
+max_line_length = 120
 
-  [analyzers.meta]
-  runtime_version = "3.x.x"
+[analyzers.meta]
+runtime_version = "3.x.x"
 
 [[transformers]]
 name = "isort"

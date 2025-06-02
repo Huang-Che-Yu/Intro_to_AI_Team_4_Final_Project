@@ -42,6 +42,15 @@ class FileFormatter(logging.Formatter):
 
 
 class LoggerManager:
+    """
+    LoggerManager is a singleton class that provides a configured logger instance.
+    The logger is configured with both a stream handler and a file handler.
+    The stream handler outputs logs to the console with colored formatting.
+    The file handler outputs logs to a file with colored formatting.
+    The logger will be configured only once and the same instance
+        will be returned on subsequent calls.
+    """
+
     logger: logging.Logger | None = None
 
     @classmethod

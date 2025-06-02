@@ -48,21 +48,6 @@ def cli(ctx):
     help="Do not include any context in the prompt",
 )
 @click.option(
-    "--no-pwd",
-    is_flag=True,
-    help="Do not include the current directory in the context",
-)
-@click.option(
-    "--no-shell",
-    is_flag=True,
-    help="Do not include the current shell in the context",
-)
-@click.option(
-    "--no-history",
-    is_flag=True,
-    help="Do not include the command history in the context",
-)
-@click.option(
     "--temperature",
     type=float,
     help="The temperature to use for sampling",
@@ -88,9 +73,6 @@ def talk(
     system,
     dry_run,
     no_context,
-    no_pwd,
-    no_shell,
-    no_history,
     temperature,
     top_p,
     no_tools,
@@ -99,6 +81,7 @@ def talk(
     """
     Takes a prompt and returns a response from the assistant.
     """
+
     logger = LoggerManager.get_logger(level=logging.DEBUG if verbose else logging.INFO)
     config = load_config()
 
@@ -117,16 +100,17 @@ def talk(
         )
     # Prepare the context
     if not no_context:
-        selected_contexts = config.contexts
-        if not no_pwd and "pwd" in selected_contexts:
+        if "pwd" in config.contexts:
             context.append(f"The current directory is {get_current_dir()}")
-        if not no_shell and "shell" in selected_contexts:
+        if "shell" in config.contexts:
             context.append(f"The current shell is {get_current_shell()}")
-        if not no_history and "history" in selected_contexts:
-            history_size = history_size or config.history_context_options.size
+        if "history" in config.contexts:
+            history = get_history(
+                history_size or config.history_context_options.size,
+                all_panes=all_panes or config.history_context_options.all_panes,
+            )
             context.append(
-                f"The terminal session are: \n"
-                f"{'\n'.join(get_history(history_size, all_panes=all_panes or config.history_context_options.all_panes))}"
+                f"The current terminal session I see is: \n" f"{'\n'.join(history)}"
             )
 
     # Prepare the model
@@ -135,20 +119,13 @@ def talk(
     model = model.lower()
 
     # Create the assistant and get the response
-    assistant = create_assistant(model, temperature, top_p, no_tools)
-    if assistant:
-        logger.info(f"Using model {model}")
-        if not dry_run:
-            for response in assistant.assist(
-                Provider.compose_messages(context, [prompt])
-            ):
-                print(response, end="", flush=True)
-        else:
-            logger.debug(f"[Dry run] Context: {context}")
-            logger.debug(f"[Dry run] Prompt: {prompt}")
-            logger.info("Dry run completed.")
-    else:
+    assistant = create_assistant(model, temperature, top_p, no_tools, dry_run)
+    if not assistant:
         logger.warning(f"Model {model} not found.")
+        return
+    logger.info(f"Using model {model}")
+    for response in assistant.assist(Provider.compose_messages(context, [prompt])):
+        print(response, end="", flush=True)
 
 
 @cli.command()
@@ -156,6 +133,7 @@ def models():
     """
     Lists all available models from all providers.
     """
+
     print(
         "Please visit https://docs.litellm.ai/docs/providers to "
         "view the available providers and models."

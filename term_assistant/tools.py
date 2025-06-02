@@ -34,15 +34,19 @@ class Tool:
             where the key is the parameter name and the value is a Parameter object.
         openai_tool (OpenAITool)
             A property to represent the tool in the format required by OpenAI.
-        mistral_tool (MistralTool)
-            A property to represent the tool in the format required by Mistral.
     """
 
     function: Callable
     parameters: dict[str, Parameter]
+    message: str = ""
 
     @property
     def openai_tool(self) -> OpenAITool:
+        """
+        Returns:
+            OpenAITool: The tool formatted for OpenAI's API.
+        """
+
         return OpenAITool(
             function=FunctionDefinition(
                 name=self.function.__name__,
@@ -66,7 +70,9 @@ class Tool:
 
 tools: dict[str, Tool] = {
     run_command.__name__: Tool(
-        run_command, {"command": Parameter("string", "The command to execute")}
+        run_command,
+        {"command": Parameter("string", "The command to execute")},
+        "\033[33mCaution: This tool may do something dangerous. Please use with caution.\033[0m",
     ),
     read_file.__name__: Tool(
         read_file, {"file_path": Parameter("string", "The path to the file to read")}

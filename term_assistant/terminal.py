@@ -28,7 +28,6 @@ def get_history(size: int, all_panes: bool = False) -> list[str]:
         tmux_server.cmd("display-message", "-p", "#S:#I:#P").stdout[0].split(":")
     )
     captured_texts: list[str] = []
-    print(all_panes)
     raw_panes = tmux_server.cmd("list-panes").stdout
     for raw_pane in raw_panes:
         pane_id = raw_pane.split(":")[0]
