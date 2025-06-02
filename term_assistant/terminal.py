@@ -1,56 +1,44 @@
 import os
-import shutil
 import subprocess
+
+import libtmux
 
 from .logging import LoggerManager
 
 
-def get_history(size: int) -> list[str]:
+def get_history(size: int, all_panes: bool = False) -> list[str]:
     """Get the command history.
 
     Args:
         size (int): The number of lines of history to include.
-                    0 for the terminal screen, -1 for full history.
+                    0 for the terminal screen.
 
     Returns:
         list[str]: The terminal history
     """
 
     logger = LoggerManager.get_logger()
-    if not os.path.exists(os.path.expanduser("~/.assistant.cast")):
-        logger.warning("No asciinema cast file found.")
+    if not os.getenv("TMUX"):
+        logger.error(
+            "TMUX environment variable not set, please run inside a tmux session"
+        )
         return []
-    asciinema_path = shutil.which("asciinema")
-    if not asciinema_path:
-        logger.warning("No asciinema program found.")
-        return []
-    result = subprocess.run(
-        [
-            asciinema_path,
-            "convert",
-            os.path.expanduser("~/.assistant.cast"),
-            "-f",
-            "txt",
-            "/dev/stdout",
-        ],
-        capture_output=True,
-        text=True,
+    tmux_server = libtmux.Server()
+    session, window, pane = (
+        tmux_server.cmd("display-message", "-p", "#S:#I:#P").stdout[0].split(":")
     )
-    if result.returncode != 0:
-        logger.error(f"Failed to convert asciinema cast file, error: {result.stderr}")
-        return []
-    history = []
-    for line in result.stdout.splitlines():
-        if line.strip():
-            history.append(" ".join(line.strip().split()))
-    if size == -1:
-        # full
-        return history[:-1]
-    elif size == 0:
-        # within the terminal screen
-        height = int(os.getenv("LINES", "50"))
-        return history[-height:-1]
-    return history[-size:-1]
+    captured_texts: list[str] = []
+    print(all_panes)
+    raw_panes = tmux_server.cmd("list-panes").stdout
+    for raw_pane in raw_panes:
+        pane_id = raw_pane.split(":")[0]
+        if all_panes or pane_id == pane:
+            captured_texts += tmux_server.cmd(
+                "capture-pane", "-p", "-t", f"{session}:{window}.{pane_id}"
+            ).stdout
+    if size == 0:
+        return captured_texts
+    return captured_texts[-size:]
 
 
 def get_current_dir() -> str:

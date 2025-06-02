@@ -15,15 +15,13 @@ envzsh = { reference = "scripts/env.zsh", type = "file" }
 
 [tool.poetry.dependencies]
 python = "^3.10"
-mistralai = "^1.2.6"
 click = "^8.1.8"
 pyyaml = "^6.0.2"
 colorama = "^0.4.6"
-ollama = "^0.4.5"
-openai = "^1.59.6"
-google-generativeai = "^0.8.3"
 grpcio = "1.67.1"
 grpcio-status = "1.67.1"
+litellm = "1.55.12"
+libtmux = "^0.40.1"
 
 [tool.flake8]
 ignore = ['E501', 'E704']
@@ -40,10 +38,8 @@ reportMissingImports = "error"
 [tool.poetry.group.dev.dependencies]
 black = "^25.1.0"
 flake8-pyproject = "^1.2.3"
-pyright = "^1.1.384"
-pyright = "^1.1.391"
+pyright = "^1.1.392"
 isort = "^5.13.2"
-
 
 [tool.poetry.group.test.dependencies]
 pytest = "^8.3.5"

@@ -5,10 +5,9 @@ from .config import load_config
 from .logging import get_logger
 
 import click
-from colorama import Fore, Style
 
 from .config import load_config
-from .llm import create_assistant, get_available_models, get_provider
+from .llm import Provider, create_assistant
 from .logging import LoggerManager
 from .terminal import get_current_dir, get_current_shell, get_history
 
@@ -27,17 +26,15 @@ def cli(ctx):
 )
 @click.option(
     "-h",
-    "--history-context-size",
+    "--history-size",
     type=int,
     help="Number of lines of history to include in the context",
     default=0,
 )
 @click.option(
-    "-p",
-    "--provider",
-    type=str,
-    help="Provider to use for completion",
-    default=None,
+    "--all-panes",
+    is_flag=True,
+    help="Include history from all panes in the context",
 )
 @click.option("-s", "--system", type=str, help="The system message", default=None)
 @click.option(
@@ -86,8 +83,8 @@ def cli(ctx):
 def talk(
     prompt,
     model,
-    history_context_size,
-    provider,
+    history_size,
+    all_panes,
     system,
     dry_run,
     no_context,
@@ -109,11 +106,9 @@ def talk(
     # System message
     system_msg = ""
     if system is None:
-        system_msg = config["SYSTEM_MESSAGES"].get(config["DEFAULT_SYSTEM_MESSAGE"], "")
+        system_msg = config.system_messages.get(config.default_system_message, "")
     else:
-        system_msg = (
-            system if " " in system else config["SYSTEM_MESSAGES"].get(system, "")
-        )
+        system_msg = system if " " in system else config.system_messages.get(system, "")
     if system_msg != "":
         context.append(system_msg)
     else:
@@ -122,38 +117,38 @@ def talk(
         )
     # Prepare the context
     if not no_context:
-        if not no_pwd and "pwd" in config["CONTEXTS"]:
+        selected_contexts = config.contexts
+        if not no_pwd and "pwd" in selected_contexts:
             context.append(f"The current directory is {get_current_dir()}")
-        if not no_shell and "shell" in config["CONTEXTS"]:
+        if not no_shell and "shell" in selected_contexts:
             context.append(f"The current shell is {get_current_shell()}")
-        if not no_history and "history" in config["CONTEXTS"]:
-            history_context_size = (
-                history_context_size or config["HISTORY_CONTEXT_SIZE"]
-            )
+        if not no_history and "history" in selected_contexts:
+            history_size = history_size or config.history_context_options.size
             context.append(
-                "The terminal session are: "
-                "\n".join(get_history(history_context_size))
+                f"The terminal session are: \n"
+                f"{'\n'.join(get_history(history_size, all_panes=all_panes or config.history_context_options.all_panes))}"
             )
 
-    # Prepare the model and provider
+    # Prepare the model
     if model is None:
-        model = config["DEFAULT_MODEL"]
-    if not provider:
-        provider = get_provider(model)
+        model = config.default_model
+    model = model.lower()
 
     # Create the assistant and get the response
-    assistant = create_assistant(provider, model, temperature, top_p, no_tools)
+    assistant = create_assistant(model, temperature, top_p, no_tools)
     if assistant:
-        logger.info(f"Using model {model} from provider {assistant.__class__.__name__}")
+        logger.info(f"Using model {model}")
         if not dry_run:
-            for response in assistant.assist(context, [prompt]):
+            for response in assistant.assist(
+                Provider.compose_messages(context, [prompt])
+            ):
                 print(response, end="", flush=True)
         else:
             logger.debug(f"[Dry run] Context: {context}")
             logger.debug(f"[Dry run] Prompt: {prompt}")
             logger.info("Dry run completed.")
     else:
-        logger.warning(f"Model {model} not found in any provider.")
+        logger.warning(f"Model {model} not found.")
 
 
 @cli.command()
@@ -161,11 +156,10 @@ def models():
     """
     Lists all available models from all providers.
     """
-    available_models = get_available_models()
-    for provider, model_names in available_models.items():
-        print(f"{Fore.BLUE}Provider: {provider}{Style.RESET_ALL}")
-        for model in model_names:
-            print(f"  {model}")
+    print(
+        "Please visit https://docs.litellm.ai/docs/providers to "
+        "view the available providers and models."
+    )
 
 
 if __name__ == "__main__":

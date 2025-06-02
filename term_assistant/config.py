@@ -5,59 +5,31 @@ import yaml
 
 
 @dataclass
-class OpenAIConfig:
+class ProviderConfig:
     """
-    Configuration settings for OpenAI.
+    Configuration settings for a provider.
 
     Attributes:
-        BASE_URL (str): The base URL for the OpenAI API.
-        API_KEY (str): The API key for the OpenAI API.
+        base_url (str): The base URL for the API.
+        api_key (str): The API key for the API.
     """
 
-    BASE_URL: str = "https://api.openai.com/v1"
-    API_KEY: str = ""
+    base_url: str = ""
+    api_key: str = ""
 
 
 @dataclass
-class MistralConfig:
+class HistoryContextOptions:
     """
-    Configuration settings for Mistral.
+    Options for the history context.
 
     Attributes:
-        BASE_URL (str): The base URL for the Mistral API.
-        API_KEY (str): The API key for the Mistral API.
+        size (int): The size of the history context.
+        all_panes (bool): Whether to include all panes in the history context.
     """
 
-    BASE_URL: str = "https://api.mistral.ai"
-    API_KEY: str = ""
-
-
-@dataclass
-class GeminiConfig:
-    """
-    Configuration settings for Gemini.
-
-    Attributes:
-        BASE_URL (str): The base URL for the Gemini API.
-        API_KEY (str): The API key for the Gemini API.
-    """
-
-    BASE_URL: str = "https://api.gemini.com"
-    API_KEY: str = ""
-
-
-@dataclass
-class OllamaConfig:
-    """
-    Configuration settings for Ollama.
-
-    Attributes:
-        BASE_URL (str): The base URL for the Ollama API.
-        API_KEY (str): The API key for the Ollama API.
-    """
-
-    BASE_URL: str = "https://api.ollama.com"
-    API_KEY: str = ""
+    size: int = 0
+    all_panes: bool = False
 
 
 @dataclass
@@ -66,32 +38,44 @@ class Config:
     Configuration settings for the term assistant application.
 
     Attributes:
-        HISTORY_CONTEXT_SIZE (int): The size of the history context to be used.
-        TEMPERATURE (float): The temperature setting for the model.
-        TOP_P (float): The top-p setting for the model.
-        DEFAULT_MODEL (str): The default model to be used.
-        DEFAULT_SYSTEM_MESSAGE (str): The default system message to be used.
-        SYSTEM_MESSAGES (dict): A dictionary of system messages.
-        OPENAI (OpenAIConfig): Configuration settings for OpenAI.
-        MISTRAL (MistralConfig): Configuration settings for Mistral.
-        GEMINI (GeminiConfig): Configuration settings for Gemini.
-        OLLAMA (OllamaConfig): Configuration settings for Ollama.
+        temperature (float): The temperature setting for the model.
+        top_p (float): The top-p setting for the model.
+        default_model (str): The default model to be used.
+        default_system_message (str): The default system message to be used.
+        system_messages (dict): A dictionary of system messages.
+        contexts (list): A list of contexts to be used.
+        contexts_options (dict): A dictionary of context options.
+        providers (dict): A dictionary of provider configurations.
     """
 
-    HISTORY_CONTEXT_SIZE: int = 5
-    TEMPERATURE: float = 0.7
-    TOP_P: float = 1.0
-    DEFAULT_MODEL: str = "gpt-4o"
-    DEFAULT_SYSTEM_MESSAGE: str = "default"
-    SYSTEM_MESSAGES: dict[str, str] = field(default_factory=dict)
-    CONTEXTS: list[str] = field(default_factory=lambda: ["shell", "pwd", "history"])
-    OPENAI: OpenAIConfig = field(default_factory=OpenAIConfig)
-    MISTRAL: MistralConfig = field(default_factory=MistralConfig)
-    GEMINI: GeminiConfig = field(default_factory=GeminiConfig)
-    OLLAMA: OllamaConfig = field(default_factory=OllamaConfig)
+    temperature: float = 0.7
+    top_p: float = 1.0
+    default_model: str = "gpt-4o"
+    default_system_message: str = "default"
+    system_messages: dict[str, str] = field(default_factory=dict)
+    contexts: list[str] = field(default_factory=lambda: ["shell", "pwd", "history"])
+    history_context_options: HistoryContextOptions = field(
+        default_factory=HistoryContextOptions
+    )
+    providers: dict[str, ProviderConfig] = field(default_factory=dict)
 
     def __getitem__(self, key):
         return getattr(self, key)
+
+    def __post_init__(self):
+        self.providers = {
+            provider: (
+                config
+                if isinstance(config, ProviderConfig)
+                else ProviderConfig(**config)
+            )
+            for provider, config in self.providers.items()
+        }
+        self.history_context_options = (
+            HistoryContextOptions(**self.history_context_options)
+            if isinstance(self.history_context_options, dict)
+            else self.history_context_options
+        )
 
     def get(self, key, default=None):
         return getattr(self, key, default)

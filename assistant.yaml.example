@@ -1,24 +1,27 @@
-HISTORY_CONTEXT_SIZE: 5
-TEMPERATURE: 0.7
-TOP_P: 1
-DEFAULT_MODEL: gpt-4o
-DEFAULT_SYSTEM_MESSAGE: "default"
-CONTEXTS:
+temperature: 0.7
+top_p: 1
+default_model: gpt-4o
+default_system_message: "default"
+contexts:
   - history
   - pwd
   - shell
-SYSTEM_MESSAGES:
-  default: "You are a terminal assistant. Your task is to assist the user with terminal commands, system administration, and shell scripting. Provide help for common command-line tools and tasks when necessary, and always answers concisely."
+history_context_options:
+  size: 0
+  all_panes: false
+system_messages:
+  default: "you are a terminal assistant. your task is to assist the user with terminal commands, system administration, and shell scripting. provide help for common command-line tools and tasks when necessary, and always answers concisely."
   empty: ""
-OPENAI:
-  BASE_URL: https://api.openai.com/v1
-  API_KEY: ''
-MISTRAL:
-  BASE_URL: https://api.mistral.ai
-  API_KEY: ''
-GEMINI:
-  BASE_URL: https://generativelanguage.googleapis.com
-  API_KEY: ''
-OLLAMA:
-  BASE_URL: http://localhost:11434
-  API_KEY: ''
+providers:
+  openai:
+    base_url: ''
+    api_key: ''
+  mistral:
+    base_url: ''
+    api_key: ''
+  gemini:
+    base_url: ''
+    api_key: ''
+  ollama:
+    base_url: http://localhost:11434
+    api_key: ''

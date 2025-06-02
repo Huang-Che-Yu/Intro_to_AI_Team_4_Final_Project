@@ -1,9 +1,6 @@
 from dataclasses import dataclass
 from typing import Callable
 
-from google.generativeai.types import FunctionDeclaration as GeminiTool
-from mistralai import Function as MistralFunction
-from mistralai import Tool as MistralTool
 from openai.types.chat import ChatCompletionToolParam as OpenAITool
 from openai.types.shared_params.function_definition import FunctionDefinition
 
@@ -54,7 +51,10 @@ class Tool:
                 ),
                 parameters={
                     "type": "object",
-                    "properties": {k: v.__dict__ for k, v in self.parameters.items()},
+                    "properties": {
+                        k: {"type": v.type, "description": v.description}
+                        for k, v in self.parameters.items()
+                    },
                     "required": [
                         k for k, v in self.parameters.items() if not v.optional
                     ],
@@ -62,29 +62,6 @@ class Tool:
             ),
             type="function",
         )
-
-    @property
-    def mistral_tool(self) -> MistralTool:
-        return MistralTool(
-            function=MistralFunction(
-                name=self.function.__name__,
-                description=(
-                    self.function.__doc__.strip() if self.function.__doc__ else ""
-                ),
-                parameters={
-                    "type": "object",
-                    "properties": {**self.parameters},
-                    "required": [
-                        k for k, v in self.parameters.items() if not v.optional
-                    ],
-                },
-            ),
-            type="function",
-        )
-
-    @property
-    def gemini_tool(self) -> GeminiTool:
-        return GeminiTool.from_function(self.function)
 
 
 tools: dict[str, Tool] = {
