@@ -12,7 +12,7 @@ term-assistant = "term_assistant.__main__:cli"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-click = "^8.2.0"
+click = "^8.2.1"
 pyyaml = "^6.0.2"
 colorama = "^0.4.6"
 litellm = "1.55.12"
