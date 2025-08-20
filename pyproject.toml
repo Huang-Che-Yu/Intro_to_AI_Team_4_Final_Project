@@ -33,7 +33,7 @@ reportMissingImports = "error"
 [tool.poetry.group.dev.dependencies]
 black = "^25.1.0"
 flake8-pyproject = "^1.2.3"
-pyright = "^1.1.400"
+pyright = "^1.1.404"
 isort = "^6.0.1"
 pyinstrument = "^5.0.1"
 
